@@ -11,9 +11,10 @@ A serverless data engineering platform that ingests, processes, and analyzes cry
     * **Compute:** Google Cloud Function (Python 3.10).
     * **Trigger:** Cloud Scheduler (Daily cron job).
     * **Storage:** Google Cloud Storage (JSON).
-2.  **Processing (Silver):** *[Coming Soon]*
-    * DuckDB for cleaning and deduplication.
-    * Parquet storage.
+2.  **Processing (Silver):**
+    * **Logic:** DuckDB (In-process OLAP) for data cleaning and transformation.
+    * **Format:** Parquet (Columnar storage) for high-performance analytics.
+    * **Schema:** Enforces strict types (Decimal for prices) and extracts Event Time from filenames.
 3.  **Analytics (Gold):** *[Coming Soon]*
     * Business logic and aggregation.
 
@@ -35,7 +36,9 @@ A serverless data engineering platform that ingests, processes, and analyzes cry
 ├── src/
 │   ├── cloud_functions/    # Production-ready Cloud Functions
 │   │   └── bronze/         # Ingestion Logic (main.py)
-│   └── bronze/             # Local testing scripts
+│   ├── bronze/             # Local testing scripts (Ingestion)
+│   └── silver/             # Local testing scripts (Transformation)
+│       └── clean.py        # DuckDB logic for JSON -> Parquet
 ├── data/                   # Local data storage (for testing)
 └── README.md
 ```
@@ -73,8 +76,11 @@ To run the logic locally without deploying to the cloud:
 # Activate environment
 source crypto-env/bin/activate
 
-# Run local ingestion script
+# 1. Run local ingestion (Bronze)
 python src/bronze/ingest.py
+
+# 2. Run local transformation (Silver)
+python src/silver/clean.py
 ```
 
 ## 🛡 Security

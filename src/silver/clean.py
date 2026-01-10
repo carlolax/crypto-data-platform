@@ -1,75 +1,53 @@
-from google.cloud import storage
-import pandas as pd
-import json
-from datetime import datetime
+import duckdb
+import os
 
 # Setup config
-PROJECT_ID = "crypto-platform-carlo-2026"
-BRONZE_BUCKET = "crypto-lake-carlo-2026-v1" 
-SILVER_BUCKET = f"crypto-silver-{PROJECT_ID}"
+BRONZE_PATH = "data/bronze/*.json"
+SILVER_PATH = "data/silver/market_history.parquet"
 
-def get_latest_file(bucket_name):
-    storage_client = storage.Client()
-    bucket = storage_client.bucket(bucket_name)
+# Ensure silver folder exists
+os.makedirs("data/silver", exist_ok=True)
+con = duckdb.connect()
 
-    blobs = list(bucket.list_blobs(prefix="raw_data/"))
+print("Starting Silver Layer Processing.")
 
-    if not blobs:
-        print("No files found in Bronze bucket.")
-        return None
+query_clean = f"""
+WITH raw_data AS (
+    -- 1. Load the raw JSON and keep the filename
+    SELECT * FROM read_json_auto('{BRONZE_PATH}', filename=True)
+),
 
-    latest_blob = sorted(blobs, key=lambda x: x.time_created)[-1]
-    print(f"Found latest file: {latest_blob.name}")
-    return latest_blob
+unpivoted_data AS (
+    -- 2. "Unpivot" converts columns (bitcoin, eth) into rows
+    UNPIVOT raw_data
+    ON bitcoin, ethereum, solana
+    INTO NAME coin_id VALUE metrics
+)
 
-def transform_data(json_data):
-    rows = []
-    for coin_name, stats in json_data.items():
-        row = {
-            "coin": coin_name,
-            "price_usd": stats.get("usd"),
-            "market_cap": stats.get("usd_market_cap"),
-            "volume_24h": stats.get("usd_24h_vol"),
-            "change_24h": stats.get("usd_24h_change"),
-            "ingested_at": datetime.now()
-        }
-        rows.append(row)
-
-    df = pd.DataFrame(rows)
-    return df
-
-def save_to_silver(df, bucket_name):
-    # Saves the DataFrame as a CSV directly to GCS
-    storage_client = storage.Client()
-    bucket = storage_client.bucket(bucket_name)
-
-    # Generate filename
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    filename = f"processed_data/crypto_clean_{timestamp}.csv"
-
-    blob = bucket.blob(filename)
-
-    # Convert DataFrame to CSV string (in-memory)
-    csv_data = df.to_csv(index=False)
-
-    blob.upload_from_string(csv_data, content_type="text/csv")
-    print(f"Clean data saved to: gs://{bucket_name}/{filename}")
-
-if __name__ == "__main__":
-    print("🚀 Starting Silver Layer Transformation.")
+SELECT
+    -- 3. Extract Timestamp from filename (Regex Magic)
+    -- Fixed: Used \\d instead of \d to avoid Python warnings
+    strptime(
+        regexp_extract(filename, 'raw_(\\d{{4}}-\\d{{2}}-\\d{{2}}_\\d{{6}})', 1),
+        '%Y-%m-%d_%H%M%S'
+    ) as recorded_at,
     
-    # 1. Get the latest raw file
-    blob = get_latest_file(BRONZE_BUCKET)
+    -- 4. Clean the Coin Name
+    coin_id,
     
-    if blob:
-        # 2. Download and Parse JSON
-        json_content = blob.download_as_string()
-        data = json.loads(json_content)
-        
-        # 3. Transform
-        clean_df = transform_data(data)
-        print("📊 Data Preview:")
-        print(clean_df.head())
-        
-        # 4. Load to Silver
-        save_to_silver(clean_df, SILVER_BUCKET)
+    -- 5. Unpack the JSON Structs (Enforce Types!)
+    CAST(metrics.usd AS DECIMAL(18, 2)) as price_usd,
+    CAST(metrics.usd_market_cap AS DECIMAL(24, 2)) as market_cap,
+    CAST(metrics.usd_24h_vol AS DECIMAL(24, 2)) as volume_24h
+
+FROM unpivoted_data
+ORDER BY recorded_at DESC, coin_id
+"""
+
+print("\nCleaned Data Preview:")
+print(con.execute(query_clean).df())
+
+# Save to Parquet
+print(f"\nSaving to {SILVER_PATH}.")
+con.execute(f"COPY ({query_clean}) TO '{SILVER_PATH}' (FORMAT PARQUET)")
+print("Saving complete.")
