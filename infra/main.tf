@@ -120,3 +120,48 @@ resource "google_cloud_scheduler_job" "daily_bronze_trigger" {
     }
   }
 }
+
+# ==============================================================================
+# SILVER LAYER: EVENT-DRIVEN FUNCTION
+# ==============================================================================
+
+# 1. Zip the Silver Source Code
+data "archive_file" "silver_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/../src/cloud_functions/silver"
+  output_path = "${path.module}/silver_function.zip"
+}
+
+# 2. Upload Zip to Source Bucket
+resource "google_storage_bucket_object" "silver_zip_upload" {
+  name   = "silver-process-${data.archive_file.silver_zip.output_md5}.zip"
+  bucket = google_storage_bucket.function_source.name
+  source = data.archive_file.silver_zip.output_path
+}
+
+# 3. The Silver Cloud Function
+resource "google_cloudfunctions_function" "silver_process" {
+  name        = "silver-process-func"
+  description = "Event-driven: Process Bronze JSON to Silver Parquet"
+  runtime     = "python310"
+  region      = var.region
+  project     = var.project_id
+
+  # DuckDB needs a bit more RAM to work its magic
+  available_memory_mb   = 512 
+  source_archive_bucket = google_storage_bucket.function_source.name
+  source_archive_object = google_storage_bucket_object.silver_zip_upload.name
+
+  entry_point           = "process_silver"
+  service_account_email = google_service_account.function_runner.email
+
+  # This trigger makes it run automatically when a file is uploaded to the Data Lake
+  event_trigger {
+    event_type = "google.storage.object.finalize" 
+    resource   = google_storage_bucket.data_lake.name
+  }
+
+  environment_variables = {
+    SILVER_BUCKET_NAME = google_storage_bucket.silver_layer.name
+  }
+}

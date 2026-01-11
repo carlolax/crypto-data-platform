@@ -12,6 +12,8 @@ A serverless data engineering platform that ingests, processes, and analyzes cry
     * **Trigger:** Cloud Scheduler (Daily cron job).
     * **Storage:** Google Cloud Storage (JSON).
 2.  **Processing (Silver):**
+    * **Compute:** Google Cloud Function (Event-Driven).
+    * **Trigger:** Cloud Storage Trigger (Fires immediately when JSON lands in Bronze).
     * **Logic:** DuckDB (In-process OLAP) for data cleaning and transformation.
     * **Format:** Parquet (Columnar storage) for high-performance analytics.
     * **Schema:** Enforces strict types (Decimal for prices) and extracts Event Time from filenames.
@@ -35,7 +37,8 @@ A serverless data engineering platform that ingests, processes, and analyzes cry
 │   └── terraform.tfvars    # Configuration values (Region, IDs)
 ├── src/
 │   ├── cloud_functions/    # Production-ready Cloud Functions
-│   │   └── bronze/         # Ingestion Logic (main.py)
+│   │   ├── bronze/         # Ingestion Logic (main.py)
+│   │   └── silver/         # Transformation Logic (main.py - Event Driven)
 │   ├── bronze/             # Local testing scripts (Ingestion)
 │   └── silver/             # Local testing scripts (Transformation)
 │       └── clean.py        # DuckDB logic for JSON -> Parquet
@@ -61,7 +64,7 @@ terraform apply
 ```
 
 ### 2. Manual Trigger (Testing)
-You can manually trigger the ingestion function from the CLI to verify it works:
+You can manually trigger the ingestion function from the CLI. Note: Because the system is event-driven, triggering the Bronze function will automatically trigger the Silver function once the file is saved.
 
 ```bash
 gcloud functions call bronze-ingest-func \

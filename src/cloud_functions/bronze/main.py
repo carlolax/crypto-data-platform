@@ -48,7 +48,7 @@ def ingest_bronze(request):
             data=json.dumps(data),
             content_type='application/json'
         )
-        print(f"✅ Uploaded to gs://{BUCKET_NAME}/{filename}")
+        print(f"Uploaded to gs://{BUCKET_NAME}/{filename}")
 
         return "Ingestion successful", 200
 
