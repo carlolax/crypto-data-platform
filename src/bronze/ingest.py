@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from google.cloud import storage
 
-# Setup Config
+# Setup config
 BUCKET_NAME = "crypto-lake-carlo-2026-v1" 
 COINS = ["bitcoin", "ethereum", "solana"]
 COINGECKO_URL = "https://api.coingecko.com/api/v3/simple/price"

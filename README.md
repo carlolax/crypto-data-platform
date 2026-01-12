@@ -1,47 +1,59 @@
 # ☁️ Crypto Data Platform (GCP + Python + Terraform)
 
-A serverless data engineering platform that ingests, processes, and analyzes cryptocurrency market data. This project uses **Infrastructure as Code (IaC)** to deploy a scalable architecture on Google Cloud Platform.
+A serverless, event-driven data engineering platform that ingests, processes, and analyzes cryptocurrency market data. This project uses **Infrastructure as Code (IaC)** to deploy a scalable, self-healing architecture on Google Cloud Platform.
 
 ## 🏗 Architecture
 
 **Region:** `australia-southeast1` (Sydney)
 
-1.  **Ingestion (Bronze):**
+The pipeline follows a "Medallion Architecture" (Bronze → Silver → Gold), where each stage automatically triggers the next.
+
+1.  **Ingestion (Bronze Layer):**
     * **Source:** CoinGecko API.
     * **Compute:** Google Cloud Function (Python 3.10).
     * **Trigger:** Cloud Scheduler (Daily cron job).
-    * **Storage:** Google Cloud Storage (JSON).
-2.  **Processing (Silver):**
-    * **Compute:** Google Cloud Function (Event-Driven).
-    * **Trigger:** Cloud Storage Trigger (Fires immediately when JSON lands in Bronze).
-    * **Logic:** DuckDB (In-process OLAP) for data cleaning and transformation.
-    * **Format:** Parquet (Columnar storage) for high-performance analytics.
-    * **Schema:** Enforces strict types (Decimal for prices) and extracts Event Time from filenames.
-3.  **Analytics (Gold):** *[Coming Soon]*
-    * Business logic and aggregation.
+    * **Storage:** Google Cloud Storage (Raw JSON).
+    * **Function:** `bronze-ingest-func`
+
+2.  **Processing (Silver Layer):**
+    * **Trigger:** Event-Driven (Fires immediately when data lands in Bronze).
+    * **Logic:** DuckDB (In-process OLAP) for data cleaning, unpivoting, and schema enforcement.
+    * **Transformation:** Handles missing fields, normalizes paths, and converts JSON to Columnar format.
+    * **Storage:** Google Cloud Storage (Parquet).
+    * **Function:** `silver-process-func`
+
+3.  **Analytics (Gold Layer):**
+    * **Trigger:** Event-Driven (Fires immediately when data lands in Silver).
+    * **Logic:** DuckDB Window Functions.
+        * Calculates **7-Day Simple Moving Average (SMA)**.
+        * Calculates **Volatility (Standard Deviation)**.
+        * Generates **Trading Signals** (BUY/SELL/WAIT).
+    * **Storage:** Google Cloud Storage (Aggregated Parquet).
+    * **Function:** `gold-analyze-func`
 
 ## 🛠 Tech Stack
 
 * **Language:** Python 3.10
 * **Infrastructure:** Terraform
 * **Database:** DuckDB (In-process SQL OLAP)
-* **Cloud:** Google Cloud Platform (Functions, Storage, Scheduler, IAM)
+* **Cloud:** Google Cloud Platform (Functions, Storage, Scheduler, IAM, Pub/Sub)
+* **Data Format:** JSON (Raw) → Parquet (Analytics)
 
 ## 📂 Project Structure
 
 ```text
 .
 ├── infra/                  # Terraform Infrastructure code
-│   ├── main.tf             # Resource definitions (Buckets, Functions)
+│   ├── main.tf             # Resource definitions (Buckets, Functions, IAM)
 │   ├── variables.tf        # Input variable declarations
 │   └── terraform.tfvars    # Configuration values (Region, IDs)
 ├── src/
 │   ├── cloud_functions/    # Production-ready Cloud Functions
 │   │   ├── bronze/         # Ingestion Logic (main.py)
-│   │   └── silver/         # Transformation Logic (main.py - Event Driven)
-│   ├── bronze/             # Local testing scripts (Ingestion)
-│   └── silver/             # Local testing scripts (Transformation)
-│       └── clean.py        # DuckDB logic for JSON -> Parquet
+│   │   ├── silver/         # Transformation Logic (Event-Driven)
+│   │   └── gold/           # Analytics & Signals Logic (Event-Driven)
+│   ├── bronze/             # Local testing scripts
+│   └── silver/             # Local testing scripts
 ├── data/                   # Local data storage (for testing)
 └── README.md
 ```
@@ -63,13 +75,22 @@ terraform plan
 terraform apply
 ```
 
-### 2. Manual Trigger (Testing)
-You can manually trigger the ingestion function from the CLI. Note: Because the system is event-driven, triggering the Bronze function will automatically trigger the Silver function once the file is saved.
+### 2. Manual Trigger (The "Domino Effect")
+You only need to trigger the Bronze function. The rest of the pipeline is fully automated.
+1. Trigger Bronze (Ingests API data).
+2. Silver auto-starts (Cleans & Converts to Parquet).
+3. Gold auto-starts (Calculates Financial Signals).
 
 ```bash
 gcloud functions call bronze-ingest-func \
   --region=australia-southeast1 \
   --data='{}'
+```
+
+### 3. Verification
+Check the final output in the Gold bucket:
+```bash
+gcloud storage ls gs://crypto-gold-[PROJECT-ID]/analytics/
 ```
 
 ## 🧪 Local Development
@@ -79,14 +100,18 @@ To run the logic locally without deploying to the cloud:
 # Activate environment
 source crypto-env/bin/activate
 
-# 1. Run local ingestion (Bronze)
+# 1. Run local ingestion
 python src/bronze/ingest.py
 
-# 2. Run local transformation (Silver)
+# 2. Run local transformation
 python src/silver/clean.py
+
+# 3. Run local analytics
+python src/gold/analyze.py
 ```
 
 ## 🛡 Security
-- Service Account: Uses a dedicated `crypto-runner-sa` with restricted permissions (`storage.admin`).
-- Region: All resources confined to `australia-southeast1` for data sovereignty.
-- Secrets: No API keys or secrets are committed to the repository.
+- **Service Account**: Uses a dedicated `crypto-runner-sa` with restricted permissions (`storage.admin`).
+- **Data Sovereignity**: All resources confined to `australia-southeast1`.
+- **Secrets**: No API keys committed to the repository.
+- **Schema Enforcement**: Strict typing in DuckDB prevents pipeline crashes from bad API data.

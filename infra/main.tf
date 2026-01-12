@@ -165,3 +165,47 @@ resource "google_cloudfunctions_function" "silver_process" {
     SILVER_BUCKET_NAME = google_storage_bucket.silver_layer.name
   }
 }
+
+# ==============================================================================
+# GOLD LAYER: ANALYTICS FUNCTION
+# ==============================================================================
+
+# 1. Zip the Gold Source Code
+data "archive_file" "gold_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/../src/cloud_functions/gold"
+  output_path = "${path.module}/gold_function.zip"
+}
+
+# 2. Upload Zip to Source Bucket
+resource "google_storage_bucket_object" "gold_zip_upload" {
+  name   = "gold-analyze-${data.archive_file.gold_zip.output_md5}.zip"
+  bucket = google_storage_bucket.function_source.name
+  source = data.archive_file.gold_zip.output_path
+}
+
+# 3. The Gold Cloud Function
+resource "google_cloudfunctions_function" "gold_analyze" {
+  name        = "gold-analyze-func"
+  description = "Event-driven: Calculate Market Signals"
+  runtime     = "python310"
+  region      = var.region
+  project     = var.project_id
+
+  available_memory_mb   = 512 
+  source_archive_bucket = google_storage_bucket.function_source.name
+  source_archive_object = google_storage_bucket_object.gold_zip_upload.name
+
+  entry_point           = "process_gold"
+  service_account_email = google_service_account.function_runner.email
+
+  # Fires when a PARQUET file lands in the SILVER bucket
+  event_trigger {
+    event_type = "google.storage.object.finalize" 
+    resource   = google_storage_bucket.silver_layer.name
+  }
+
+  environment_variables = {
+    GOLD_BUCKET_NAME = google_storage_bucket.gold_layer.name
+  }
+}
