@@ -25,13 +25,13 @@ TARGET_COINS = env_coins if env_coins else "bitcoin,ethereum,solana"
 
 # Main function
 def ingest_bronze_local():
-    print(f"Starting Bronze Layer Ingestion.")
+    print(f"Starting Bronze Layer Ingesting.")
     print(f"  Target Coins: {TARGET_COINS}")
 
     # Creates the directory automatically
     os.makedirs(DATA_DIR, exist_ok=True)
 
-    # Parameters that will be only extracted from CoinGecko API
+    # Parameters to send to the CoinGecko API (filtering for specific IDs)
     params = {
         "ids": TARGET_COINS,
         "vs_currencies": "usd",

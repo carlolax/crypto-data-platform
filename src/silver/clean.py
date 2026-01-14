@@ -1,53 +1,91 @@
-import duckdb
-import os
+import json
+import pandas as pd
+from pathlib import Path
+from datetime import datetime
 
-# Setup config
-BRONZE_PATH = "data/bronze/*.json"
-SILVER_PATH = "data/silver/market_history.parquet"
+# SETUP:
+# Calculates the project root: /Users/<NAME>/Developer/crypto-project/
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# Ensure silver folder exists
-os.makedirs("data/silver", exist_ok=True)
-con = duckdb.connect()
+# Directory that points to: /Users/<NAME>/Developer/crypto-project/data/bronze
+BRONZE_DIR = BASE_DIR / "data" / "bronze"
 
-print("Starting Silver Layer Processing.")
+# Directory that points to: /Users/<NAME>/Developer/crypto-project/data/silver
+SILVER_DIR = BASE_DIR / "data" / "silver"
 
-query_clean = f"""
-WITH raw_data AS (
-    -- 1. Load the raw JSON and keep the filename
-    SELECT * FROM read_json_auto('{BRONZE_PATH}', filename=True)
-),
-
-unpivoted_data AS (
-    -- 2. "Unpivot" converts columns (bitcoin, eth) into rows
-    UNPIVOT raw_data
-    ON bitcoin, ethereum, solana
-    INTO NAME coin_id VALUE metrics
-)
-
-SELECT
-    -- 3. Extract Timestamp from filename (Regex Magic)
-    -- Fixed: Used \\d instead of \d to avoid Python warnings
-    strptime(
-        regexp_extract(filename, 'raw_(\\d{{4}}-\\d{{2}}-\\d{{2}}_\\d{{6}})', 1),
-        '%Y-%m-%d_%H%M%S'
-    ) as recorded_at,
+# Main function
+def process_silver_local():
+    print("Starting Silver Layer Cleaning.")
     
-    -- 4. Clean the Coin Name
-    coin_id,
+    # Ensure Silver directory exists
+    SILVER_DIR.mkdir(parents=True, exist_ok=True)
     
-    -- 5. Unpack the JSON Structs (Enforce Types!)
-    CAST(metrics.usd AS DECIMAL(18, 2)) as price_usd,
-    CAST(metrics.usd_market_cap AS DECIMAL(24, 2)) as market_cap,
-    CAST(metrics.usd_24h_vol AS DECIMAL(24, 2)) as volume_24h
+    # Locate all JSON files in 'data/bronze' directory
+    # Use list() to convert the generator to a list as counter
+    json_files = list(BRONZE_DIR.glob("*.json"))
+    
+    if not json_files:
+        print("No Bronze data found. Run ingest.py first.")
+        return
 
-FROM unpivoted_data
-ORDER BY recorded_at DESC, coin_id
-"""
+    print(f"Found. Located: {len(json_files)} raw files to process.")
 
-print("\nCleaned Data Preview:")
-print(con.execute(query_clean).df())
+    # An empty list variable for appending the stored extracted data
+    data_list = []
 
-# Save to Parquet
-print(f"\nSaving to {SILVER_PATH}.")
-con.execute(f"COPY ({query_clean}) TO '{SILVER_PATH}' (FORMAT PARQUET)")
-print("Saving complete.")
+    # Loop through files and extract data
+    for file_path in json_files:
+        # Attempt to open and parse each Bronze Layer JSON file safely, if it fails, it will show an error message
+        try:
+            with open(file_path, "r") as f:
+                data = json.load(f)
+                
+                # Extract timestamp metadata from the filename for lineage tracking
+                filename_parts = file_path.stem.split("_")
+                if len(filename_parts) >= 3:
+                    timestamp_str = f"{filename_parts[2]}_{filename_parts[3]}"
+                else:
+                    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+                # Flatten the JSON data format
+                for coin_id, metrics in data.items():
+                    row = {
+                        "coin_id": coin_id,
+                        "price_usd": metrics.get("usd"),
+                        "volume_24h": metrics.get("usd_24h_vol"),
+                        "extraction_timestamp": timestamp_str, # Adding metadata
+                        "source_file": file_path.name
+                    }
+                    data_list.append(row)
+
+        except Exception as error:
+            print(f"Error reading {file_path.name}: {error}")
+            continue
+
+    # Create DataFrame
+    if data_list:
+        df = pd.DataFrame(data_list)
+        
+        # Data cleaning by converting price to float
+        df["price_usd"] = df["price_usd"].astype(float)
+        
+        # Shows the number of rows processed
+        print(f"Processed {len(df)} rows of data.")
+
+        # Previews the data
+        print(df.head())
+
+        # Generate a timestamped filename and save the cleaned data to the Silver layer as a Parquet file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_file = SILVER_DIR / f"clean_market_data_{timestamp}.parquet"
+
+        # Save the parquet file
+        df.to_parquet(output_file, index=False)
+        print(f"Saved Silver Data to: {output_file}")
+        
+    else:
+        print("No valid data extracted.")
+
+# Entry point for running the silver layer (clean) locally
+if __name__ == "__main__":
+    process_silver_local()

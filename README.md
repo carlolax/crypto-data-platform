@@ -17,18 +17,17 @@ The pipeline follows a "Medallion Architecture" (Bronze → Silver → Gold), wh
 
 2.  **Processing (Silver Layer):**
     * **Trigger:** Event-Driven (Fires immediately when data lands in Bronze).
-    * **Logic:** DuckDB (In-process OLAP) for data cleaning, unpivoting, and schema enforcement.
-    * **Transformation:** Handles missing fields, normalizes paths, and converts JSON to Columnar format.
+    * **Logic:** Pandas (Local) / DuckDB (Cloud) for cleaning and unpivoting.
+    * **Transformation:** Handles missing fields, normalizes paths, and converts JSON to Columnar format (Parquet).
     * **Storage:** Google Cloud Storage (Parquet).
     * **Function:** `silver-process-func`
 
 3.  **Analytics (Gold Layer):**
     * **Trigger:** Event-Driven (Fires immediately when data lands in Silver).
-    * **Logic:** DuckDB Window Functions.
-        * Calculates **7-Day Simple Moving Average (SMA)**.
-        * Calculates **Volatility (Standard Deviation)**.
-        * Generates **Trading Signals** (BUY/SELL/WAIT).
-    * **Storage:** Google Cloud Storage (Aggregated Parquet).
+    * **Logic:** Aggregation & Window Functions.
+        * Calculates **Avg/Min/Max Prices**.
+        * Generates **Market Summary Reports**.
+    * **Storage:** Google Cloud Storage (Aggregated CSV/Parquet).
     * **Function:** `gold-analyze-func`
 
 4.  **Visualization (The Command Center):**
@@ -40,11 +39,11 @@ The pipeline follows a "Medallion Architecture" (Bronze → Silver → Gold), wh
 
 * **Language:** Python 3.10
 * **Infrastructure:** Terraform
-* **Database:** DuckDB (In-process SQL OLAP)
+* **Data Processing:** Pandas (Local), DuckDB (Cloud/OLAP)
 * **Cloud:** Google Cloud Platform (Functions, Storage, Scheduler, IAM, Pub/Sub)
 * **Visualization:** Streamlit, Plotly
 * **Testing:** Pytest, Mocks (unittest.mock)
-* **Data Format:** JSON (Raw) → Parquet (Analytics)
+* **Data Format:** JSON (Raw) → Parquet (Compressed) → CSV (Analytics)
 
 ## 📂 Project Structure
 
@@ -59,13 +58,17 @@ The pipeline follows a "Medallion Architecture" (Bronze → Silver → Gold), wh
 │   │   ├── bronze/         # Ingestion Logic (main.py)
 │   │   ├── silver/         # Transformation Logic (Event-Driven)
 │   │   └── gold/           # Analytics & Signals Logic (Event-Driven)
-│   ├── bronze/             # Local testing scripts
-│   ├── silver/             # Local testing scripts
+│   ├── bronze/             # Local ingestion script (ingest.py)
+│   ├── silver/             # Local cleaning script (clean.py)
+│   ├── gold/               # Local analytics script (analyze.py)
 │   └── dashboard.py        # Streamlit Strategy Dashboard
 ├── tests/                  # Unit Test Suite
 │   ├── test_bronze.py      # Bronze Layer Tests (Mocked API)
 │   └── test_silver.py      # Silver Layer Tests (Mocked GCS + Real DuckDB)
 ├── data/                   # Local data storage (for testing)
+│   ├── bronze/             # Raw JSON files
+│   ├── silver/             # Cleaned Parquet files
+│   └── gold/               # Final Aggregated CSVs
 └── README.md
 ```
 
