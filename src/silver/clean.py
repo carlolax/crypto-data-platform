@@ -76,10 +76,10 @@ def process_silver_local():
         print(df.head())
 
         # Implement idempotency by saving the entire cleaned data on a single parquet file
-        output_file = SILVER_DIR / "silver_crypto_prices.parquet"
+        output_file = SILVER_DIR / "cleaned_crypto_prices.parquet"
         
         df.to_parquet(output_file, index=False)
-        print(f"Saved silver data to: {output_file}")
+        print(f"Saved cleaned data to: {output_file}")
         
     else:
         print("No valid data extracted.")
