@@ -75,13 +75,11 @@ def process_silver_local():
         # Previews the data
         print(df.head())
 
-        # Generate a timestamped filename and save the cleaned data to the Silver layer as a Parquet file
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = SILVER_DIR / f"clean_market_data_{timestamp}.parquet"
-
-        # Save the parquet file
+        # Implement idempotency by saving the entire cleaned data on a single parquet file
+        output_file = SILVER_DIR / "silver_crypto_prices.parquet"
+        
         df.to_parquet(output_file, index=False)
-        print(f"Saved Silver Data to: {output_file}")
+        print(f"Saved silver data to: {output_file}")
         
     else:
         print("No valid data extracted.")
