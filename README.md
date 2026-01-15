@@ -58,9 +58,11 @@ The pipeline follows a "Medallion Architecture" (Bronze → Silver → Gold), wh
 │   │   ├── bronze/         # Ingestion Logic (main.py)
 │   │   ├── silver/         # Transformation Logic (Event-Driven)
 │   │   └── gold/           # Analytics & Signals Logic (Event-Driven)
-│   ├── bronze/             # Local ingestion script (ingest.py)
-│   ├── silver/             # Local cleaning script (clean.py)
-│   ├── gold/               # Local analytics script (analyze.py)
+│   ├── pipeline/           # Local Data Pipeline Logic
+│   │   ├── bronze/         # Local ingestion script (ingest.py)
+│   │   ├── silver/         # Local cleaning script (clean.py)
+│   │   ├── gold/           # Local analytics script (analyze.py)
+│   │   └── run_pipeline.py # Pipeline Orchestrator (Runs all layers)
 │   └── dashboard.py        # Streamlit Strategy Dashboard
 ├── tests/                  # Unit Test Suite
 │   ├── test_bronze.py      # Bronze Layer Tests (Mocked API)
@@ -127,14 +129,14 @@ To run the logic locally without deploying to the cloud:
 # Activate environment
 source crypto-env/bin/activate
 
-# 1. Run local ingestion
-python src/bronze/ingest.py
-
-# 2. Run local transformation
-python src/silver/clean.py
-
-# 3. Run local analytics
-python src/gold/analyze.py
+# Run the Orchestrator
+python src/pipeline/run_pipeline.py
+```
+*Alternatively, you can run individual layers manually:*
+```bash
+python src/pipeline/bronze/ingest.py
+python src/pipeline/silver/clean.py
+python src/pipeline/gold/analyze.py
 ```
 
 ## 🛡 Security

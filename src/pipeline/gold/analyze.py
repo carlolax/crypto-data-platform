@@ -2,13 +2,13 @@ import duckdb
 from pathlib import Path
 
 # SETUP:
-# Calculates the project root: /Users/<NAME>/Developer/crypto-project/
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+# Calculates the project root by going up 4 levels: 1. gold -> 2. pipeline -> 3. src -> 4. crypto-project
+BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
 # Path that points to: /Users/<NAME>/Developer/crypto-project/data/silver/cleaned_crypto_prices.parquet file
 SILVER_PATH = BASE_DIR / "data" / "silver" / "cleaned_crypto_prices.parquet"
 
-# Directory that points to: /Users/<NAME>/Developer/crypto-project/data/gold
+# Directory that points to: /Users/<NAME>/Developer/crypto-project/data/gold/
 GOLD_DIR = BASE_DIR / "data" / "gold"
 
 # Path that points to: /Users/<NAME>/Developer/crypto-project/data/gold/market_summary.parquet file

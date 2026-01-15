@@ -4,13 +4,13 @@ from pathlib import Path
 from datetime import datetime
 
 # SETUP:
-# Calculates the project root: /Users/<NAME>/Developer/crypto-project/
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+# Calculates the project root by going up 4 levels: 1. silver -> 2. pipeline -> 3. src -> 4. crypto-project
+BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
-# Directory that points to: /Users/<NAME>/Developer/crypto-project/data/bronze
+# Directory that points to: /Users/<NAME>/Developer/crypto-project/data/bronze/
 BRONZE_DIR = BASE_DIR / "data" / "bronze"
 
-# Directory that points to: /Users/<NAME>/Developer/crypto-project/data/silver
+# Directory that points to: /Users/<NAME>/Developer/crypto-project/data/silver/
 SILVER_DIR = BASE_DIR / "data" / "silver"
 
 # Main function
