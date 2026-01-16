@@ -21,7 +21,7 @@ resource "google_project_iam_member" "runner_storage_admin" {
 resource "google_storage_bucket" "data_lake" {
   name                     = var.bucket_name
   location                 = var.region
-  force_destroy            = true # Allows deletion even if full
+  force_destroy            = true
   storage_class            = "STANDARD"
   public_access_prevention = "enforced"
   
@@ -32,7 +32,7 @@ resource "google_storage_bucket" "data_lake" {
 resource "google_storage_bucket" "silver_layer" {
   name                     = "crypto-silver-${var.project_id}"
   location                 = var.region
-  force_destroy            = true # <--- ADDED THIS FIXED IT
+  force_destroy            = true
   storage_class            = "STANDARD"
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
@@ -49,7 +49,7 @@ resource "google_storage_bucket" "silver_layer" {
 resource "google_storage_bucket" "gold_layer" {
   name                     = "crypto-gold-${var.project_id}"
   location                 = var.region
-  force_destroy            = true # <--- ADDED THIS FIXED IT
+  force_destroy            = true
   storage_class            = "STANDARD"
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
@@ -94,9 +94,8 @@ resource "google_cloudfunctions_function" "bronze_ingest" {
   source_archive_bucket = google_storage_bucket.function_source.name
   source_archive_object = google_storage_bucket_object.bronze_zip_upload.name
   trigger_http          = true
-  entry_point           = "ingest_bronze"
+  entry_point           = "process_data_ingestion"
   
-  # TELL GOOGLE TO USE OUR NEW ROBOT!
   service_account_email = google_service_account.function_runner.email
 
   environment_variables = {
@@ -114,7 +113,6 @@ resource "google_cloud_scheduler_job" "daily_bronze_trigger" {
     http_method = "POST"
     uri         = google_cloudfunctions_function.bronze_ingest.https_trigger_url
     
-    # The Scheduler also needs permission to call the function
     oidc_token {
       service_account_email = google_service_account.function_runner.email
     }
@@ -147,15 +145,13 @@ resource "google_cloudfunctions_function" "silver_process" {
   region      = var.region
   project     = var.project_id
 
-  # DuckDB needs a bit more RAM to work its magic
   available_memory_mb   = 512 
   source_archive_bucket = google_storage_bucket.function_source.name
   source_archive_object = google_storage_bucket_object.silver_zip_upload.name
 
-  entry_point           = "process_silver"
+  entry_point           = "process_data_cleaning"
   service_account_email = google_service_account.function_runner.email
 
-  # This trigger makes it run automatically when a file is uploaded to the Data Lake
   event_trigger {
     event_type = "google.storage.object.finalize" 
     resource   = google_storage_bucket.data_lake.name
@@ -196,10 +192,9 @@ resource "google_cloudfunctions_function" "gold_analyze" {
   source_archive_bucket = google_storage_bucket.function_source.name
   source_archive_object = google_storage_bucket_object.gold_zip_upload.name
 
-  entry_point           = "process_gold"
+  entry_point           = "process_data_analytics"
   service_account_email = google_service_account.function_runner.email
 
-  # Fires when a PARQUET file lands in the SILVER bucket
   event_trigger {
     event_type = "google.storage.object.finalize" 
     resource   = google_storage_bucket.silver_layer.name
