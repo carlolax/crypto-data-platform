@@ -45,7 +45,7 @@ resource "google_storage_bucket" "silver_layer" {
   }
 }
 
-# --- GOLD LAYER (Aggregated Data) ---
+# --- GOLD LAYER (Analyze Data) ---
 resource "google_storage_bucket" "gold_layer" {
   name                     = "crypto-gold-${var.project_id}"
   location                 = var.region
@@ -132,15 +132,15 @@ data "archive_file" "silver_zip" {
 
 # 2. Upload Zip to Source Bucket
 resource "google_storage_bucket_object" "silver_zip_upload" {
-  name   = "silver-process-${data.archive_file.silver_zip.output_md5}.zip"
+  name   = "silver-cleaning-${data.archive_file.silver_zip.output_md5}.zip"
   bucket = google_storage_bucket.function_source.name
   source = data.archive_file.silver_zip.output_path
 }
 
 # 3. The Silver Cloud Function
-resource "google_cloudfunctions_function" "silver_process" {
-  name        = "silver-process-func"
-  description = "Event-driven: Process Bronze JSON to Silver Parquet"
+resource "google_cloudfunctions_function" "silver_cleaning" {
+  name        = "silver-cleaning-func"
+  description = "Event-driven: Clean Bronze JSON to Silver Parquet"
   runtime     = "python310"
   region      = var.region
   project     = var.project_id
@@ -183,7 +183,7 @@ resource "google_storage_bucket_object" "gold_zip_upload" {
 # 3. The Gold Cloud Function
 resource "google_cloudfunctions_function" "gold_analyze" {
   name        = "gold-analyze-func"
-  description = "Event-driven: Calculate Market Signals"
+  description = "Event-driven: Analyze Market Signals"
   runtime     = "python310"
   region      = var.region
   project     = var.project_id
