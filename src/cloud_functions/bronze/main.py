@@ -10,12 +10,12 @@ BUCKET_NAME = os.environ.get("BRONZE_BUCKET_NAME", "crypto-bronze-crypto-platfor
 
 @functions_framework.http
 def ingest_bronze(request):
-    print(f"Starting Bronze Ingestion at {datetime.now()}")
+    print(f"Starting data ingestion at {datetime.now()}")
 
     # Fetch data from CoinGecko
     url = "https://api.coingecko.com/api/v3/simple/price"
     params = {
-        "ids": "bitcoin,ethereum,solana",
+        "ids": "bitcoin,ethereum,solana,cardano",
         "vs_currencies": "usd",
         "include_24hr_vol": "true"
     }

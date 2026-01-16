@@ -14,7 +14,7 @@ def process_silver(cloud_event):
     file_name = data["name"]
     source_bucket_name = data["bucket"]
     
-    print(f"Event triggered! Source: gs://{source_bucket_name}/{file_name}")
+    print(f"Event triggered. Source: gs://{source_bucket_name}/{file_name}")
 
     # Safety Check: Ignore folders or non-json files
     if not file_name.endswith(".json"):
@@ -43,14 +43,15 @@ def process_silver(cloud_event):
                         columns={{
                             'bitcoin': 'STRUCT(usd DOUBLE, usd_market_cap DOUBLE, usd_24h_vol DOUBLE)',
                             'ethereum': 'STRUCT(usd DOUBLE, usd_market_cap DOUBLE, usd_24h_vol DOUBLE)',
-                            'solana': 'STRUCT(usd DOUBLE, usd_market_cap DOUBLE, usd_24h_vol DOUBLE)'
+                            'solana': 'STRUCT(usd DOUBLE, usd_market_cap DOUBLE, usd_24h_vol DOUBLE)',
+                            'cardano': 'STRUCT(usd DOUBLE, usd_market_cap DOUBLE, usd_24h_vol DOUBLE)',
                         }},
                         filename=True
                     )
                 ),
                 unpivoted_data AS (
                     UNPIVOT raw_data
-                    ON bitcoin, ethereum, solana
+                    ON bitcoin, ethereum, solana, cardano
                     INTO NAME coin_id VALUE metrics
                 )
                 SELECT

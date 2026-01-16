@@ -14,7 +14,7 @@ def process_gold(cloud_event):
     source_bucket_name = data["bucket"]
     new_file_name = data["name"]
 
-    print(f"Gold Triggered by: gs://{source_bucket_name}/{new_file_name}")
+    print(f"Event triggered. Source: gs://{source_bucket_name}/{new_file_name}")
 
     # Define paths
     local_dir = "/tmp/silver_history"

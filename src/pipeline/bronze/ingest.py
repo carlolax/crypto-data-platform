@@ -21,7 +21,7 @@ COINGECKO_API_URL = "https://api.coingecko.com/api/v3/simple/price"
 
 # Check .env for specific coins, otherwise, it will use the default list
 env_coins = os.getenv("COINS_TO_FETCH")
-TARGET_COINS = env_coins if env_coins else "bitcoin,ethereum,solana"
+TARGET_COINS = env_coins if env_coins else "bitcoin,ethereum,solana,cardano"
 
 # Main function
 def ingest_bronze_local():
