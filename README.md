@@ -4,7 +4,7 @@ A serverless, event-driven data engineering platform that ingests, processes, an
 
 ## 🏗 Architecture
 
-**Region:** `australia-southeast1` (Sydney)
+**Region:** `us-central1` (Iowa) - *Optimized for GCP Free Tier*
 
 The pipeline follows a "Medallion Architecture" (Bronze → Silver → Gold), where each stage automatically triggers the next.
 
@@ -13,14 +13,14 @@ The pipeline follows a "Medallion Architecture" (Bronze → Silver → Gold), wh
     * **Compute:** Google Cloud Function (Python 3.10).
     * **Trigger:** Cloud Scheduler (Daily cron job).
     * **Storage:** Google Cloud Storage (Raw JSON).
-    * **Function:** `bronze-ingest-func`
+    * **Function:** `bronze-ingesting-func`
 
 2.  **Processing (Silver Layer):**
     * **Trigger:** Event-Driven (Fires immediately when data lands in Bronze).
     * **Logic:** DuckDB (SQL-on-Serverless).
     * **Transformation:** Performs Schema Enforcement (filters unknown coins) and unpivots data from Wide to Long format.
     * **Storage:** Google Cloud Storage (Parquet).
-    * **Function:** `silver-process-func`
+    * **Function:** `silver-cleaning-func`
 
 3.  **Analytics (Gold Layer):**
     * **Trigger:** Event-Driven (Fires immediately when data lands in Silver).
@@ -28,7 +28,7 @@ The pipeline follows a "Medallion Architecture" (Bronze → Silver → Gold), wh
         * Calculates **7-Day Moving Averages** and **Volatility**.
         * Generates **Buy/Wait/Hold Signals**.
     * **Storage:** Google Cloud Storage (Parquet).
-    * **Function:** `gold-analyze-func`
+    * **Function:** `gold-analyzing-func`
 
 4.  **Visualization (The Command Center):**
     * **Tool:** Streamlit (Python-based UI).
@@ -83,7 +83,6 @@ The pipeline follows a "Medallion Architecture" (Bronze → Silver → Gold), wh
 
 ### 1. Infrastructure Setup
 Navigate to the infrastructure folder and apply the Terraform configuration.
-
 ```bash
 cd infra
 terraform init
@@ -94,8 +93,8 @@ terraform apply
 ### 2. Manual Trigger (The "Domino Effect")
 You only need to trigger the Bronze function. The rest of the pipeline is fully automated.
 ```bash
-gcloud functions call bronze-ingest-func \
-  --region=australia-southeast1 \
+gcloud functions call bronze-ingesting-func \
+  --region=us-central1 \
   --data='{}'
 ```
 
